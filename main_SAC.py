@@ -2,8 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import time
 import argparse
+import time
 
 from model.Network_SAC import *
 from model.ReplayBuffer import *
@@ -63,12 +63,14 @@ def train():
             )
 
         print(f"Q-Value Loss: {q_value_loss.item()} ", 
-            f"Value Loss: {value_loss.item()} ", 
-            f"Policy Loss: {policy_loss.item()} ")
+              f"Value Loss: {value_loss.item()} ", 
+              f"Policy Loss: {policy_loss.item()} ")
         
         q_losses.append(q_value_loss.item())
         valus_losses.append(value_loss.item())
         policy_losses.append(policy_loss.item())
+
+        return f"\nQ-Value Loss: {q_value_loss.item()}, Value Loss: {value_loss.item()}, Policy Loss: {policy_loss.item()} "
 
     use_cuda = torch.cuda.is_available()
     device   = torch.device("cuda" if use_cuda else "cpu")
@@ -117,7 +119,10 @@ def train():
     q_losses      = []
     valus_losses  = []
     policy_losses = []
-    batch_size  = opt.batch_size
+    loss_log      = ""
+    batch_size    = opt.batch_size
+
+    start_time = time.time()
 
     while frame_idx < max_frames:
         print("Environment reset!!")
@@ -133,7 +138,7 @@ def train():
             
             replay_buffer.push(state, action, reward, next_state, done)
             if len(replay_buffer) > batch_size:
-                soft_q_update(batch_size)
+                loss_log = soft_q_update(batch_size)
             
             state = next_state
             episode_reward += reward
@@ -147,10 +152,17 @@ def train():
             
         rewards.append(episode_reward)
         frame_idxs.append(frame_idx)
-        print(f"Frame : {frame_idx:4}, ", "Reward : ", episode_reward)
+
+        log_data = {'frame_idx'      : frame_idx,
+                    'max_frames'     : max_frames,
+                    'episode_reward' : episode_reward,
+                    'start_time'     : start_time, 
+                    'loss_log'       : loss_log,
+                    }
+        record_training_log(log_data, result_path)
+
     
     # Save result
-    result_path, weights_path = create_path(opt.task_name, opt.path_option)
     plot_or_save(frame_idxs,       rewards,      "Reward", result_path)
     plot_or_save(frame_idxs,      q_losses,      "Q_loss", result_path)
     plot_or_save(frame_idxs,  valus_losses,  "Value_loss", result_path)
@@ -163,9 +175,10 @@ if __name__ == "__main__":
     parser.add_argument('--weights', type=str, default='.pth', help='model.pt path(s)')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size')
     parser.add_argument('--task_name', type=str, default="PD_like_params", help='what task_name in path')
-    parser.add_argument('--path_option', type=str, default="", help='path option')
-    parser.add_argument('--max_frames', type=int, default=1000, help='maximum iteration')
+    parser.add_argument('--path_option', type=str, default="hidden_1024", help='path option')
+    parser.add_argument('--max_frames', type=int, default=100, help='maximum iteration')
     parser.add_argument('--hidden_dim', type=int, default=256, help='hidden_dim of networks')
     opt = parser.parse_args()
+    result_path, weights_path = create_path(opt.task_name, opt.path_option)
     train()
-    # python main_SAC.py --batch_size 16 --hidden_dim 512
+    # python main_SAC.py --batch_size 16 --hidden_dim 1024 --max_frames 10000
