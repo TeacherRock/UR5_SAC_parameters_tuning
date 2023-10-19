@@ -82,6 +82,7 @@ def train():
 
     # PD-like Controller
     env = Environment(6 , 12)
+    env.save = [0]
     action_dim = env.action_dim  # PD-like parmas (Kp, Kv)
     state_dim  = env.state_dim   # Joint Angle
 
@@ -170,15 +171,45 @@ def train():
 
     torch.save(policy_net.state_dict(), weights_path + ".pth")
 
+def PTP():
+    use_cuda = torch.cuda.is_available()
+    device   = torch.device("cuda" if use_cuda else "cpu")
+
+    env = Environment(6 , 12)
+    
+    goal = [1.47164123, -1.0, 1.76184294, -1.1, -1.57079628, -1.8164123]
+    env.set_Goal(goal)
+    env.save = [1]
+
+    action_dim = env.action_dim  # PD-like parmas (Kp, Kv)
+    state_dim  = env.state_dim
+    weight = opt.weights
+    policy_net = PolicyNetwork(state_dim, action_dim, 1024).to(device)
+    policy_net.load_state_dict(torch.load(weight))
+
+    state = env.reset()
+
+    state = np.array(state)
+    action = policy_net.get_action(state)
+    env.step(action)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default='.pth', help='model.pt path(s)')
+    parser.add_argument('--weights', type=str, default='model.pth', help='model.pt path(s)')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size')
     parser.add_argument('--task_name', type=str, default="PD_like_params", help='what task_name in path')
     parser.add_argument('--path_option', type=str, default="hidden_1024", help='path option')
     parser.add_argument('--max_frames', type=int, default=100, help='maximum iteration')
     parser.add_argument('--hidden_dim', type=int, default=256, help='hidden_dim of networks')
+    parser.add_argument('--usefulness', type=str, default="train", help='train or PTP')
     opt = parser.parse_args()
-    result_path, weights_path = create_path(opt.task_name, opt.path_option)
-    train()
+
+    if opt.usefulness == "train":
+        result_path, weights_path = create_path(opt.task_name, opt.path_option)
+        train()
+    elif opt.usefulness == "PTP":
+        PTP()
+    else:
+        pass
     # python main_SAC.py --batch_size 16 --hidden_dim 1024 --max_frames 10000
+    # python main_SAC.py --usefulness PTP --weights ./weights/20231017_001715_PD_like_params_hidden_1024.pth

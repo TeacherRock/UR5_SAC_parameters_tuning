@@ -48,7 +48,6 @@ def Tij(j, theta, col):
 	    
   return A_i
 
-
 # theta : joint angle
 #   col : which column in joint angle matrix
 def FK(theta, col):  
@@ -149,3 +148,38 @@ def IK(desired_pos):
       elif theta[r, c] < -pi:
         theta[r, c] = theta[r, c] + 2*pi
   return theta
+
+def euler_to_rot_matrix(euler_Angle):
+    roll  = euler_Angle[0]
+    pitch = euler_Angle[1]
+    yaw   = euler_Angle[2]
+
+    R_x = np.array([[1,            0,             0],
+                    [0, np.cos(roll), -np.sin(roll)],
+                    [0, np.sin(roll), np.cos(roll)]])
+
+    R_y = np.array([[ np.cos(pitch),  0, np.sin(pitch)],
+                    [             0,  1,             0],
+                    [-np.sin(pitch),  0, np.cos(pitch)]])
+
+    R_z = np.array([[np.cos(yaw), -np.sin(yaw),  0],
+                    [np.sin(yaw),  np.cos(yaw),  0],
+                    [          0,            0,  1]])
+
+    rot_matrix = np.dot(R_z, np.dot(R_y, R_x))
+
+    return rot_matrix
+
+def rot_trans_to_matrix(rot_mat, trans_vec):
+    transformation_matrix = np.zeros((4, 4))
+    transformation_matrix[:3, :3] = rot_mat
+    transformation_matrix[:3, 3] = trans_vec
+    transformation_matrix[3, 3] = 1
+    return transformation_matrix
+
+
+if __name__ == '__main__':
+  point = np.array([ 0.6, -0.1, 0.245])
+  Orinn = np.array([0, pi, pi])
+  R_matrix = euler_to_rot_matrix(Orinn)
+  print(rot_trans_to_matrix(R_matrix, point))

@@ -7,10 +7,10 @@ import matplotlib.pyplot as plt
 def create_path(task_name, option):
     current_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
     if option is not None:
-        result_path  = "./result/"  + f"{current_datetime}_{task_name}_{option}"
+        result_path  = "./data/result/"  + f"{current_datetime}_{task_name}_{option}"
         weights_path = "./weights/" + f"{current_datetime}_{task_name}_{option}"
     else:
-        result_path  = "./result/"  + f"{current_datetime}_{task_name}"
+        result_path  = "./data/result/"  + f"{current_datetime}_{task_name}"
         weights_path = "./weights/" + f"{current_datetime}_{task_name}"
 
     if not os.path.exists(result_path):

@@ -19,23 +19,28 @@ class Environment():
         self.upper_bound  = np.array([2000, 2000, 2000, 2000, 2000, 2000, 2, 2, 2, 2, 2, 2])
         self.lower_bound  = np.zeros([1, 12])
         self.clientID     = Vrep_connect()
-        self.whatgoal     = True
+        self.random_Goal  = True
+        self.goal         = np.zeros([1, 6])
 
     def reset(self):
         # Reset the environment
         # Vrep_stop(self.clientID)
         Vrep_disconnect(self.clientID)
         self.clientID = Vrep_connect()
-        self.whatgoal = True
+        self.random_Goal = True
         state = self.get_state()
         return state
 
 
-    def step(self, action):
+    def step(self, action, ):
         # _action = self.NormalizeAction(action)
         # do action and return next_state, _reward, done
         self.NormalizeAction(action)
-        _goal = self.randomGoal()
+        
+        if self.randomGoal:
+            _goal = self.randomGoal()
+        else:
+            _goal = self.goal
         # _goal = [1.47164123,  0.33726598,  1.66184294, -0.42831264, -1.57079628,  1.47164123]
         
         # print("Action : ", _action)
@@ -65,7 +70,7 @@ class Environment():
         _action = []
         _action.extend(_action_[0])
 
-        _, _, _, _ = Vrep_callLuafunction(self.clientID, 'set_Env_Py', [], _goal + _action, [], bytearray())
+        _, _, _, _ = Vrep_callLuafunction(self.clientID, 'set_Env_Py', self.save, _goal + _action, [], bytearray())
         time.sleep(2)
 
         Vrep_start(self.clientID)
@@ -170,6 +175,9 @@ class Environment():
         # print(self._action)
         # return self._action 
 
+    def set_Goal(self, goal):
+        self.random_Goal = False
+        self.goal = goal
     
 if __name__ == '__main__':
     env = Environment(2, 2)

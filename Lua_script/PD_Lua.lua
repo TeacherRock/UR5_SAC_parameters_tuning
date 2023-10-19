@@ -37,6 +37,7 @@ function sysCall_init()
 
     _done = 0
     _genScurve = 1
+    save = {}
     
     print("Start simulation")
 end
@@ -81,6 +82,10 @@ function PTP()
         end
     else
         step = 'stay'
+        local filePath = sim.getStringParameter(sim.stringparam_scene_path) .. "/result/record.txt"
+        if save[1] == 1 then
+            UR.SaveData(Cmd, Record, filePath)
+        end
         return
     end
     tt = tt + 1
@@ -115,6 +120,8 @@ function set_Env_Py(inInts, inFloats, inStrings, inBuffer)
         V = {},        
         TorCtrl = {}
     }
+    table.insert(save, inInts[1])
+    print(save)
     return outInts, outFloats, outStrings, outBuffer
 end
 
