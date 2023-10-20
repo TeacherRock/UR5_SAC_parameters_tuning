@@ -25,11 +25,17 @@ class sCurve_Params:
         self.eff = params['eff']
 
 class Cmd:
-    def __init__(self, cmd):
-        self.P = cmd['P']
-        self.V = cmd['V']
-        self.A = cmd['A']
-        self.J = cmd['J']
+    def __init__(self, cmd = {}):
+        if cmd == {}:
+            self.P = np.array([])
+            self.V = np.array([])
+            self.A = np.array([])
+            self.J = np.array([])
+        else:
+            self.P = cmd['P']
+            self.V = cmd['V']
+            self.A = cmd['A']
+            self.J = cmd['J']
 
 def gen_Scurve(params, coordinate = "Joint"):
     # 7 stage Scurve
@@ -71,11 +77,11 @@ def gen_Scurve(params, coordinate = "Joint"):
     try:
         command_save_path = params.save_path
         if_Save = True
-    except NameError:
+    except AttributeError:
         if_Save = False
 
     for i in range(Axis):
-        if S[i] < (Vmax[i] * Vmax[i] / Aavg[i]) and S[i] != 0:
+        if S[i] < (Vmax[i] ** 2 / Aavg[i]) and S[i] != 0:
             Vmax[i] = math.sqrt(S[i] * Aavg[i])
         # Time Interval Length
         Ta[i] = Vmax[i] / Aavg[i]
@@ -159,16 +165,6 @@ def gen_Scurve(params, coordinate = "Joint"):
                                 - 1/2 * t4 ** 2 + 1/2 * t5 ** 2 + 1/2 * t6 ** 2 + t1 * t3 + t2 * t3) * t
                                 + 1/2 * (t4 - t5 - t6) * t ** 2 + 1/6 * t ** 3)
         t += sampT
-    
-    if if_Save:
-        current_datetime = datetime.datetime.now()
-        # filename = f"Scurve_{current_datetime.strftime('%Y%m%d_%H%M%S')}.txt"
-        filename = command_save_path
-        with open(filename, 'w') as file:
-            for i in range(num_points-1):
-                row = np.concatenate((PCmd[i, :], VCmd[i, :], ACmd[i, :], JCmd[i, :]))
-                row_str = ' '.join(map(str, row))
-                file.write(row_str + '\n')
 
     cmd = {
         'P': PCmd,
@@ -177,11 +173,23 @@ def gen_Scurve(params, coordinate = "Joint"):
         'J': JCmd
     }
     
-    if coordinate == "Cartesian":
+    Trajectory = []
+    if coordinate == "Cartesian2Joint":
         orien      = params.eff
         Trajectory = command_cartesian_to_joint(cmd, orien)
     else:
-        Trajectory = Cmd(cmd)
+        Trajectory.append(Cmd(cmd))
+
+    if if_Save:
+        # current_datetime = datetime.datetime.now()
+        # filename = f"Scurve_{current_datetime.strftime('%Y%m%d_%H%M%S')}.txt"
+        filename = command_save_path
+        with open(filename, 'w') as file:
+            for j in range(len(Trajectory)):
+                for i in range(num_points-2):
+                    row = np.concatenate((Trajectory[j].P[i, :], Trajectory[j].V[i, :], Trajectory[j].A[i, :]))
+                    row_str = ' '.join(map(str, row))
+                    file.write(row_str + '\n')
 
     return Trajectory
 
@@ -192,14 +200,24 @@ def command_cartesian_to_joint(cmd, orien):
         desired_pos = rot_trans_to_matrix(euler_to_rot_matrix(orien), c_PCmd[i, :])
         j_PCmd[i, :, :] = IK(desired_pos)
 
-    filename = "../data/input/command_joint.txt"
-    with open(filename, 'w') as file:
-        for i in range(c_PCmd.shape[0]):
-            row = j_PCmd[i, :, 0]
-            for j in range(7):
-                row = np.concatenate((row, j_PCmd[i, :, j+1]))
-            row_str = ' '.join(map(str, row))
-            file.write(row_str + '\n')
+    cmd_lists = []
+    for i in range(8):
+        temp   = Cmd()
+        temp.P = j_PCmd[:, :, i]
+        temp.V, temp.A = central_difference(temp.P, 0.001, 2)
+        cmd_lists.append(temp)
+
+    # filename = "../data/input/command_joint.txt"
+    # with open(filename, 'w') as file:
+    #     for i in range(c_PCmd.shape[0]):
+    #         row = j_PCmd[i, :, 0]
+    #         for j in range(7):
+    #             row = np.concatenate((row, j_PCmd[i, :, j+1]))
+    #         row_str = ' '.join(map(str, row))
+    #         file.write(row_str + '\n')
+    return cmd_lists
+
+    
 
 
 def plotCmd(Cmd, params):
@@ -214,7 +232,7 @@ def plotCmd(Cmd, params):
     plt.xlabel('Time (s)')
     plt.ylabel('Position')
     plt.legend()
-    plt.title('Position Commands')
+    plt.title('Position Command')
     plt.show()
 
     # Velocity commands
@@ -224,7 +242,7 @@ def plotCmd(Cmd, params):
     plt.xlabel('Time (s)')
     plt.ylabel('Velocity')
     plt.legend()
-    plt.title('Velocity Commands')
+    plt.title('Velocity Command')
     plt.show()
 
     # Acceleration commands
@@ -234,7 +252,7 @@ def plotCmd(Cmd, params):
     plt.xlabel('Time (s)')
     plt.ylabel('Acceleration')
     plt.legend()
-    plt.title('Acceleration Commands')
+    plt.title('Acceleration Command')
     plt.show()
 
     # Jerk commands
@@ -245,6 +263,29 @@ def plotCmd(Cmd, params):
     plt.ylabel('Jerk')
     plt.legend()
     plt.show()
+
+def central_difference(data, h, order=2):
+    if order < 2 or order > 5:
+        raise ValueError("Order must be between 2 and 5 for central difference.")
+    if order == 2:
+        d_data  = (data[2:, :] - data[:-2, :]) / (2 * h)
+        dd_data = (data[2:, :] - 2 * data[1:-1, :] + data[:-2, :]) / (h ** 2)
+    elif order == 3:
+        d_data  = (-data[2:, :] + 4 * data[1:-1, :] - 3 * data[:-2, :]) / (2 * h)
+        dd_data = (-data[2:, :] + 2 * data[1:-1, :] - data[:-2, :]) / h ** 2
+    elif order == 4:
+        d_data  = (-data[3:, :] + 9 * data[2:-1, :] - 45 * data[1:-2, :] + 45 * data[:-3, :]) / (60 * h)
+        dd_data = (-data[3:, :] + 12 * data[2:-1, :] - 39 * data[1:-2, :] + 28 * data[:-3, :]) / (6 * h ** 2)
+    elif order == 5:
+        d_data  = (3 * data[2:, :] - 16 * data[1:-1, :] + 36 * data[:-2, :]) / (12 * h)
+        dd_data = (-data[3:, :] + 12 * data[2:-1, :] - 39 * data[1:-2, :] + 28 * data[:-3, :]) / (6 * h ** 2)
+
+    return d_data, dd_data
+
+def difference(data, time_step):
+    d_data = (data[1:, :] - data[:-1, :]) / time_step
+    dd_data = (d_data[1:, :] - d_data[:-1, :]) / time_step
+    return d_data, dd_data
 
 
 if __name__ == '__main__':
@@ -260,7 +301,10 @@ if __name__ == '__main__':
     }
 
     c_Param = sCurve_Params(params)
-    c_Cmd   = gen_Scurve(c_Param, "Cartesian")
+    command = gen_Scurve(c_Param, "Cartesian2Joint")
+
+    # j_Cmd_cen_diff, j_Cmd_cen_ddiff = central_difference(j_Cmd.P[:, :, 0])
+    # j_Cmd_diff, j_Cmd_ddiff = difference(j_Cmd.P[:, :, 0])
 
     # plotCmd(c_Cmd, c_Param)
 
